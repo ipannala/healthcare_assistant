@@ -12,6 +12,7 @@ import datetime
 from psycopg.rows import dict_row
 from Bio import Entrez
 import random
+import regex as re
 
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -110,20 +111,41 @@ def add_medical_records(patient_id: int, condition_names: str, medications: str,
     conn.close()
     return "Patient record updated successfully."
 
-def book_appointment(patient_id: int, doctor_name: str, appointment_time: datetime.datetime) -> str:
+def book_appointment(patient_id: int, doctor_name: str, start_time: datetime.datetime, end_time: datetime.datetime, date: datetime.datetime) -> str:
     conn = psycopg.connect(database_connection)
     cur = conn.cursor()
+     # --- coerce patient_id to int, even if it arrives as "(5017)" or "5017" ---
+    if isinstance(patient_id, str):
+        m = re.search(r'\d+', patient_id)
+        if not m:
+            raise ValueError("patient_id must contain digits")
+        patient_id = int(m.group())
+    else:
+        patient_id = int(patient_id)
+    
+    if isinstance(start_time, str):
+        start_time = datetime.fromisoformat(start_time)
+    if isinstance(end_time, str):
+        end_time = datetime.fromisoformat(end_time)
+    if isinstance(date, str):
+        date = datetime.fromisoformat(date)
+        
     cur.execute(
-        """SELECT doctor_id FROM public.doctor_schedule WHERE doctor_name = %s AND specialty = 'Nephrology'""", (doctor_name,)
+        """SELECT doctor_id FROM public.doctor_information WHERE full_name = %s""", (doctor_name,)
     )
-    doctor_id = cur.fetchone()
-    if not doctor_id:
+    row = cur.fetchone()
+    if not row:
         return "Doctor not found."
+    if isinstance(row, tuple):
+        doctor_id = row[0]
+    else:
+        doctor_id = row.get("doctor_id")
+
     cur.execute(
-        """INSERT INTO public.appointments (patient_id, doctor_id, appointment_time) VALUES (%s, %s, %s)""",
-        (patient_id, doctor_id, appointment_time)
+        """INSERT INTO public.doctor_schedule (patient_id, doctor_id, start_time, end_time, date) VALUES (%s, %s, %s, %s, %s)""",
+        (patient_id, doctor_id, start_time, end_time, date)
     )
     conn.commit()
     cur.close()
     conn.close()
-    return f"Appointment booked successfully for patient {patient_id} with Dr. {doctor_name} at {appointment_time}"
+    return f"Appointment booked successfully for patient {patient_id} with Dr. {doctor_name} at {start_time}"
