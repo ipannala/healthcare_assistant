@@ -14,12 +14,14 @@ from Bio import Entrez
 import random
 import regex as re
 
+#load environment labels
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 database_connection = os.getenv("DATABASE_URL")
 email = os.getenv("EMAIL")
 ncbi_api_key = os.getenv("NCBI_API_KEY")
 
+#pos dictionary for lemmatization tags
 POS_MAP = {
     "NOUN": "n",
     "VERB": "v",
@@ -27,8 +29,10 @@ POS_MAP = {
     "ADV": "r"
 }
 
-# Functions from the original `functions.py` file
 def router_intent(messages: str) -> dict:
+    """
+    Function takes user query as input and updates user_intent_dict dictionary with what the user is requesting
+    """
     user_intent_dict: Dict[str, Any] = {
         'booking_appointment': False,
         'retrieve_medical_summary': False,
@@ -58,6 +62,10 @@ def router_intent(messages: str) -> dict:
     return user_intent_dict
 
 def retrieve_patient_information(patient_id: int) -> Optional[tuple[str, str, str]]:
+    """
+    Function takes patient id as input and retrieves doctor notes, medications, and condition information from the
+    patient records information
+    """
     conn = psycopg.connect(database_connection)
     cur = conn.cursor(row_factory=dict_row)
     cur.execute("""SELECT condition_names, medications, doctor_notes FROM public."ehr_records" where patient_id = %s""", (patient_id,))
@@ -74,6 +82,9 @@ def retrieve_patient_information(patient_id: int) -> Optional[tuple[str, str, st
     return condition_information, medication_information, doctor_notes
 
 def lookup_medical_information(search_query: str) -> str:
+    """
+    Function takes user query as input and looks up the search request in PubMed and retrieves medical research information
+    """
     current_year = datetime.date.today().year
     year_from = current_year - 5
     year_to = current_year
@@ -94,6 +105,9 @@ def lookup_medical_information(search_query: str) -> str:
     return string_text
 
 def add_medical_records(patient_id: int, condition_names: str, medications: str, doctor_notes: str) -> str:
+    """
+    Function adds new medical information for patient in the patient records table
+    """
     conn = psycopg.connect(database_connection)
     cur = conn.cursor()
     cur.execute(
@@ -112,6 +126,9 @@ def add_medical_records(patient_id: int, condition_names: str, medications: str,
     return "Patient record updated successfully."
 
 def book_appointment(patient_id: int, doctor_name: str, start_time: datetime.datetime, end_time: datetime.datetime, date: datetime.datetime) -> str:
+    """
+    Function takes patient appointment request and adds to the doctor schedule table
+    """
     conn = psycopg.connect(database_connection)
     cur = conn.cursor()
      # --- coerce patient_id to int, even if it arrives as "(5017)" or "5017" ---
@@ -122,7 +139,7 @@ def book_appointment(patient_id: int, doctor_name: str, start_time: datetime.dat
         patient_id = int(m.group())
     else:
         patient_id = int(patient_id)
-    
+ 
     if isinstance(start_time, str):
         start_time = datetime.fromisoformat(start_time)
     if isinstance(end_time, str):
