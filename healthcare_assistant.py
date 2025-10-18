@@ -5,20 +5,12 @@ from autogen_agentchat.teams import SelectorGroupChat
 from autogen_core.tools import FunctionTool
 from autogen_agentchat.conditions import TextMentionTermination
 from typing import Optional, List, Dict, Any
-from dotenv import load_dotenv
-import os
 from functions import retrieve_patient_information,lookup_medical_information,add_medical_records,book_appointment, router_intent
 from functools import partial
 from openai import RateLimitError
 import asyncio
 import random
 
-# Load environment variables
-load_dotenv()
-openai_api_key = os.getenv("OPENAI_API_KEY")
-database_connection = os.getenv("DATABASE_URL")
-email = os.getenv("EMAIL")
-ncbi_api_key = os.getenv("NCBI_API_KEY")
 
 # Set up the OpenAI model client
 model = OpenAIChatCompletionClient(
@@ -84,10 +76,6 @@ group_chat_manager = AssistantAgent(
     model_client=model,
     system_message="You are the group chat manager, responsible for making sure the group conversation is terminated when the user's request has been fulfilled or an exit condition is met.",
     description="This agent is a group chat manager.",
-)
-
-user_proxy = UserProxyAgent(
-    name="User_Proxy"
 )
 
 def _extract_text_from_thread(thread) -> str:
